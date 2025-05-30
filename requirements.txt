@@ -7,6 +7,6 @@ combo
 plotly
 streamlit-lottie
 requests
-scikit-learn==1.1.1
+scikit-learn==1.6.1
 streamlit-option-menu
 matplotlib
