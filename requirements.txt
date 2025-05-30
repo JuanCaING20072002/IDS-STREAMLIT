@@ -1,0 +1,12 @@
+joblib
+streamlit
+pandas
+numpy
+pyod
+combo
+plotly
+streamlit-lottie
+requests
+scikit-learn=1.1.1
+streamlit-option-menu
+matplotlib
