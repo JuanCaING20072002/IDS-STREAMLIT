@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.zip
+*.tar.xz
+entorno_servidor/
+nuevoEntorno/

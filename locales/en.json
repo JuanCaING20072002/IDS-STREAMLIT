@@ -1,0 +1,104 @@
+{
+  "app": {
+    "title": "IDS for IoT - Intrusion Detection",
+    "welcome": "Welcome to the IoT Network Intrusion Detection System",
+    "language": "Language",
+    "model_select": "Select detection model",
+    "metric_select": "Select metric type",
+    "run": "Run",
+    "stop": "Stop",
+    "capture": "Start packet capture",
+    "upload_csv": "Upload CSV file",
+    "results": "Results",
+    "dashboard": "Dashboard",
+    "home": "Home"
+  },
+  "nav": { "title": "Navigation" },
+  "home": {
+    "title": "Intrusion Detection System for IoT",
+    "intro": "Welcome to the Intrusion Detection System for IoT — an advanced solution to monitor and detect anomalies in IoT networks. It uses IForest, OCSVM, K-Means and a Multiclass Autoencoder to analyze complex patterns and alert in real time.",
+    "objectives": {
+      "title": "System Objectives",
+      "items": "- 🔍 Real-time anomaly detection\n- 📊 Predictive pattern analysis\n- 🚫 Potential threat identification\n- 📈 Continuous performance monitoring"
+    },
+    "results": {
+      "title": "Result Interpretation",
+      "validation": "#### 🟢 Validation Metrics\n- Silhouette Score: Cluster quality (ideal > 0.5)\n- Calinski Score: Separation between clusters\n- Davies Score: Within-cluster similarity",
+      "classes": "#### 🔰 Anomaly Classification\n- Normal: Expected network traffic\n- Anomalous: Suspicious patterns\n- Multiclass:\n  - Normal\n  - DDoS_TCP\n  - DDoS_UDP\n  - Reconnaissance",
+      "compute": "#### 📈 Compute Resource Metrics\n- % CPU usage per second\n- % Memory usage\n- % Disk usage\n- Duration (seconds)"
+    },
+    "models": {
+      "title": "Anomaly Detection Models",
+      "ocsvm": {"title": "OCSVM (One-Class Support Vector Machine)", "desc": "OCSVM builds a boundary that encloses most normal data and marks as anomalies the points outside it. Useful for unusual IoT behaviors."},
+      "iforest": {"title": "IForest (Isolation Forest)", "desc": "Isolation Forest isolates points using random trees; efficient for large volumes and useful for network anomaly detection."},
+      "kmeans": {"title": "K-Means", "desc": "Clusters data into internally similar groups. Useful for grouping patterns and spotting outliers."},
+      "autoencoder": {"title": "Multiclass Autoencoder", "desc": "Combines autoencoder and supervised head for joint reconstruction and prediction."}
+    },
+    "howto": {
+      "title": "How to Use the Dashboard",
+      "lead": "Follow these steps to use the anomaly detection dashboard:",
+      "step1": {"title": "Step 1: Select Model", "desc": "📌 Choose the detection model (IForest, K-Means, OCSVM, Autoencoder)."},
+      "step2": {"title": "Step 2: Capture Packets", "desc": "📤 Start capturing network packets."},
+      "step3": {"title": "Step 3: Run Prediction", "desc": "🖱 Run the prediction with a single click."},
+      "step4": {"title": "Step 4: View Results and Internal Metrics", "desc": "📊 Explore interactive charts and metrics."},
+      "step5": {"title": "Step 5: Save Results to CSV", "desc": "📄 Pick a file name and save your results."}
+    },
+    "reco": {
+      "title": "Result Types and Recommendations",
+      "recommendation": "Recommendation",
+      "normal": {"title": "Normal Results", "desc": "Data classified as normal.", "action": "Continue regular monitoring."},
+      "anomalous": {"title": "Anomalous Results", "desc": "Anomalous data detected in the network.", "action": "Investigate and mitigate potential risks."},
+      "attacks": {"title": "Specific Attack Results", "content": "<h5>DDoS_TCP</h5><p><strong>Recommendation:</strong> Enable SYN cookies and rate limits.</p><h5>DDoS_UDP</h5><p><strong>Recommendation:</strong> Allow only necessary ports and apply rate limits.</p><h5>Reconnaissance</h5><p><strong>Recommendation:</strong> Restrict ICMP and expose only necessary ports.</p>"}
+    }
+  },
+  "dashboard": {
+    "title": "Detection Dashboard",
+    "control_panel": "Control Panel",
+    "model_select": "Select detection model",
+    "model_help": "Each model uses different techniques to detect anomalies",
+    "metric_select": "Select metric type",
+    "metric_help": "Choose the type of evaluation metrics",
+    "metric": {"external": "External", "internal": "Internal"},
+    "capture": {"header": "Network Traffic Capture and Analysis"},
+    "traffic_select": "Select traffic method",
+    "traffic": {"start_capture": "Start packet capture", "open_pcap": "Open pcap capture"},
+    "buttons": {"start_capture": "Start Capture", "save_csv": "Save CSV", "run_prediction": "Run Prediction"},
+    "messages": {
+      "capturing": "Capturing packets...",
+      "capture_done": "Capture completed.",
+      "captured_packets": "Captured packets:",
+      "data_ready": "Captured data ready for prediction",
+      "data_loaded": "Data loaded successfully",
+      "need_data": "Please capture packets or upload a CSV before prediction.",
+      "csv_saved": "CSV saved successfully.",
+      "save_before": "Capture traffic or run a prediction before saving."
+    },
+    "load_data": "Load Data for Prediction",
+    "upload_help": "Upload your network data in CSV format",
+    "preview": "Data preview",
+    "dataset_dims": "Dataset dimensions: {rows} rows, {cols} columns",
+    "filename_label": "Enter a name for your file"
+  },
+  "footer": {"title": "IoT Anomaly Detection System"},
+  "models": {
+    "iforest": "IForest (Isolation Forest)",
+    "ocsvm": "OCSVM (One Class SVM)",
+    "kmeans": "K-MEANS",
+    "autoencoder": "Multiclass Autoencoder"
+  },
+  "guide": {
+    "title": "User Guide",
+    "steps": [
+      "Select model",
+      "Configure capture or file",
+      "Run analysis",
+      "Review metrics and alerts"
+    ]
+  },
+  "alerts": {
+    "normal": "Normal",
+    "ddos_tcp": "DDoS TCP",
+    "ddos_udp": "DDoS UDP",
+    "recon": "Reconnaissance"
+  }
+}

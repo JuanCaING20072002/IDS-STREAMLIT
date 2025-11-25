@@ -1,3 +1,22 @@
+<<<<<<< HEAD
 raspberry_api/raspberry_api/
 raspberry-api/
 ProyectoStreamLit-clean/
+=======
+# Entornos virtuales
+nuevoEntorno/
+entorno_servidor/
+venv/
+.env
+
+# Archivos de instalación
+*.zip
+*.exe
+*.msi
+
+# Archivos temporales
+_pycache_/
+*.pyc
+*.pyo
+*.log
+>>>>>>> 0cdb35b (Actualización general: reemplazo y subida de archivos, ignorando archivos grandes y de sistema)

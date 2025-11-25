@@ -1,0 +1,104 @@
+{
+  "app": {
+    "title": "Sistema IDS IoT - Detección de Intrusiones",
+    "welcome": "Bienvenido al Sistema de Detección de Intrusiones en Redes IoT",
+    "language": "Idioma",
+    "model_select": "Seleccione el modelo de detección",
+    "metric_select": "Seleccione el tipo de métrica",
+    "run": "Iniciar",
+    "stop": "Detener",
+    "capture": "Iniciar captura de paquetes",
+    "upload_csv": "Subir archivo CSV",
+    "results": "Resultados",
+    "dashboard": "Panel de Control",
+    "home": "Inicio"
+  },
+  "nav": { "title": "Navegación" },
+  "home": {
+    "title": "Sistema de Detección de Intrusiones para IoT",
+    "intro": "Bienvenido al Sistema de Detección de Intrusiones para IoT — una solución avanzada diseñada para monitorear y detectar anomalías en redes IoT, brindando seguridad y confiabilidad. El sistema utiliza IForest, OCSVM, K-Means y un Autoencoder Multiclase para analizar patrones complejos y alertar sobre irregularidades en tiempo real.",
+    "objectives": {
+      "title": "Objetivos del Sistema",
+      "items": "- 🔍 Detección de anomalías en tiempo real\n- 📊 Análisis predictivo de patrones\n- 🚫 Identificación de amenazas potenciales\n- 📈 Monitoreo continuo de rendimiento"
+    },
+    "results": {
+      "title": "Interpretación de Resultados",
+      "validation": "#### 🟢 Métricas de Validación\n- Silhouette Score: Calidad del clúster (ideal > 0.5)\n- Calinski Score: Separación entre clústeres\n- Davies Score: Similitud intra-clúster",
+      "classes": "#### 🔰 Clasificación de Anomalías\n- Normal: Tráfico esperado\n- Anómalo: Patrones sospechosos\n- Multiclase:\n  - Normal\n  - DDoS_TCP\n  - DDoS_UDP\n  - Reconnaissance",
+      "compute": "#### 📈 Métricas de Recursos\n- % Uso CPU por segundo\n- % Uso de memoria\n- % Uso de disco\n- Duración (segundos)"
+    },
+    "models": {
+      "title": "Modelos de Detección de Anomalías",
+      "ocsvm": {"title": "OCSVM (One-Class Support Vector Machine)", "desc": "OCSVM crea una frontera que encierra la mayoría de datos normales y marca como anomalías los puntos fuera de ella. Útil para detectar comportamientos inusuales en IoT."},
+      "iforest": {"title": "IForest (Isolation Forest)", "desc": "Isolation Forest aísla puntos mediante árboles aleatorios; eficiente para grandes volúmenes y útil en detección de anomalías de red."},
+      "kmeans": {"title": "K-Means", "desc": "Agrupa datos en clústeres internos similares y distintos entre sí. Útil para agrupar patrones y detectar outliers."},
+      "autoencoder": {"title": "Autoencoder Multiclase", "desc": "Combina autoencoder y capa supervisada para reconstrucción y predicción conjunta."}
+    },
+    "howto": {
+      "title": "Cómo usar el Panel",
+      "lead": "Sigue estos pasos para usar el panel de detección de anomalías:",
+      "step1": {"title": "Paso 1: Seleccionar Modelo", "desc": "📌 Elige el modelo (IForest, K-Means, OCSVM, Autoencoder)."},
+      "step2": {"title": "Paso 2: Capturar Paquetes", "desc": "📤 Inicia la captura de tráfico de red."},
+      "step3": {"title": "Paso 3: Ejecutar Predicción", "desc": "🖱 Ejecuta la predicción con un clic."},
+      "step4": {"title": "Paso 4: Ver Resultados y Métricas", "desc": "📊 Explora gráficos y métricas interactivas."},
+      "step5": {"title": "Paso 5: Guardar CSV", "desc": "📄 Asigna un nombre y guarda los resultados."}
+    },
+    "reco": {
+      "title": "Tipos de Resultados y Recomendaciones",
+      "recommendation": "Recomendación",
+      "normal": {"title": "Resultados Normales", "desc": "Datos clasificados como normales.", "action": "Continúa monitoreando regularmente."},
+      "anomalous": {"title": "Resultados Anómalos", "desc": "Se detectaron anomalías en la red.", "action": "Investiga y mitiga riesgos potenciales."},
+      "attacks": {"title": "Resultados con ataques específicos", "content": "<h5>DDoS_TCP</h5><p><strong>Recomendación:</strong> Habilita SYN cookies y límites de tasa.</p><h5>DDoS_UDP</h5><p><strong>Recomendación:</strong> Permite solo puertos necesarios y aplica límites de tasa.</p><h5>Reconnaissance</h5><p><strong>Recomendación:</strong> Restringe ICMP y expón solo puertos necesarios.</p>"}
+    }
+  },
+  "dashboard": {
+    "title": "Panel de Detección",
+    "control_panel": "Panel de Control",
+    "model_select": "Seleccione el modelo de detección",
+    "model_help": "Cada modelo usa técnicas distintas para detectar anomalías",
+    "metric_select": "Seleccione el tipo de métrica",
+    "metric_help": "Elija el tipo de métricas de evaluación",
+    "metric": {"external": "Externas", "internal": "Internas"},
+    "capture": {"header": "Captura y Análisis de Tráfico"},
+    "traffic_select": "Seleccione el método de tráfico",
+    "traffic": {"start_capture": "Iniciar captura de paquetes", "open_pcap": "Abrir captura pcap"},
+    "buttons": {"start_capture": "Iniciar captura", "save_csv": "Guardar CSV", "run_prediction": "Ejecutar Predicción"},
+    "messages": {
+      "capturing": "Capturando paquetes...",
+      "capture_done": "Captura completada.",
+      "captured_packets": "Paquetes capturados:",
+      "data_ready": "Datos listos para predicción",
+      "data_loaded": "Datos cargados correctamente",
+      "need_data": "Capture paquetes o suba un CSV antes de predecir.",
+      "csv_saved": "CSV guardado correctamente.",
+      "save_before": "Capture o prediga antes de guardar."
+    },
+    "load_data": "Cargar Datos para Predicción",
+    "upload_help": "Sube tu archivo CSV de tráfico de red",
+    "preview": "Vista previa de datos",
+    "dataset_dims": "Dimensiones del dataset: {rows} filas, {cols} columnas",
+    "filename_label": "Escribe un nombre para tu archivo"
+  },
+  "footer": {"title": "Sistema de Detección de Anomalías IoT"},
+  "models": {
+    "iforest": "IForest (Isolation Forest)",
+    "ocsvm": "OCSVM (One Class SVM)",
+    "kmeans": "K-MEANS",
+    "autoencoder": "Autoencoder Multiclase"
+  },
+  "guide": {
+    "title": "Guía de Uso",
+    "steps": [
+      "Seleccionar modelo",
+      "Configurar captura o archivo",
+      "Ejecutar análisis",
+      "Revisar métricas y alertas"
+    ]
+  },
+  "alerts": {
+    "normal": "Normal",
+    "ddos_tcp": "DDoS TCP",
+    "ddos_udp": "DDoS UDP",
+    "recon": "Reconocimiento"
+  }
+}
