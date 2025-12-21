@@ -1,22 +1,25 @@
-<<<<<<< HEAD
-raspberry_api/raspberry_api/
-raspberry-api/
-ProyectoStreamLit-clean/
-=======
-# Entornos virtuales
+## Entornos virtuales
 nuevoEntorno/
 entorno_servidor/
 venv/
 .env
 
-# Archivos de instalación
+## Archivos binarios/instaladores
 *.zip
 *.exe
 *.msi
 
-# Archivos temporales
-_pycache_/
+## Archivos temporales / cache
+__pycache__/
 *.pyc
 *.pyo
 *.log
->>>>>>> 0cdb35b (Actualización general: reemplazo y subida de archivos, ignorando archivos grandes y de sistema)
+
+## Base de datos local de autenticación
+auth.db
+
+## Archivos grandes locales no versionados
+code.deb
+kmeans_normal.csv
+Python-3.11.5.tgz
+requeriments_servidor.txt
