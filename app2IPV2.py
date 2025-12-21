@@ -212,7 +212,7 @@ with st.sidebar:
         if st.button("Cerrar sesión", key="logout_btn"):
             st.session_state.authenticated = False
             st.session_state.username = None
-            st.experimental_rerun()
+            st.rerun()
     selected = option_menu(
         "Navegación",
         ["Inicio", "Panel de Control", "Comparar Modelos"],
