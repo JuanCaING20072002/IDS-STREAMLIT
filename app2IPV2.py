@@ -150,7 +150,7 @@ def _login_ui():
                     st.session_state.authenticated = True
                     st.session_state.username = u
                     st.success("Autenticación exitosa. Redirigiendo…")
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error(msg)
         with c2:
