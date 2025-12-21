@@ -213,6 +213,11 @@ with st.sidebar:
             st.session_state.authenticated = False
             st.session_state.username = None
             st.rerun()
+        # Umbral de normalidad para Autoencoder
+        st.session_state.ae_normal_threshold = st.slider(
+            "Umbral Normal (Autoencoder)", min_value=0.0, max_value=1.0, value=0.60, step=0.01,
+            help="Si la probabilidad de 'Normal' es mayor o igual al umbral, se clasifica como Normal."
+        )
     selected = option_menu(
         "Navegación",
         ["Inicio", "Panel de Control", "Comparar Modelos"],
@@ -938,13 +943,37 @@ def show_dashboard_page():
                     predicciones = dbscan_predict(db, X)
 
                 if(model_option=='AUTOENCODER'):
-                    # Usar predicción directa del pipeline/estimator del autoencoder
+                    # Usar predict_proba para decidir Normal vs Ataque con umbral
+                    proba = None
                     try:
-                        predicciones = model.predict(data)
+                        if hasattr(model, 'predict_proba'):
+                            proba = model.predict_proba(data)
+                        else:
+                            est = getattr(model, 'named_steps', {}).get('autoencoder_classifier', None)
+                            if est is not None and hasattr(est, 'predict_proba'):
+                                proba = est.predict_proba(data)
                     except Exception:
-                        est = getattr(model, 'named_steps', {}).get('autoencoder_classifier', None)
-                        predicciones = est.predict(data) if est is not None else np.zeros(len(data), dtype=int)
-                    scores=""
+                        proba = None
+
+                    if proba is not None and isinstance(proba, np.ndarray):
+                        normal_idx = 0
+                        thr = st.session_state.get('ae_normal_threshold', 0.60)
+                        pred_list = []
+                        for row in proba:
+                            if row[normal_idx] >= thr:
+                                pred_list.append(0)
+                            else:
+                                pred_list.append(int(np.argmax(row)))
+                        predicciones = np.array(pred_list, dtype=int)
+                        scores = proba[:, normal_idx]
+                    else:
+                        # Fallback a predict si no hay proba
+                        try:
+                            predicciones = model.predict(data)
+                        except Exception:
+                            est = getattr(model, 'named_steps', {}).get('autoencoder_classifier', None)
+                            predicciones = est.predict(data) if est is not None else np.zeros(len(data), dtype=int)
+                        scores = ""
 
                 # Construcción de pp3 condicionada a transformador disponible
                 pp3 = None
