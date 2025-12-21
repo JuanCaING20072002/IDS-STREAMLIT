@@ -218,6 +218,10 @@ with st.sidebar:
             "Umbral Normal (Autoencoder)", min_value=0.0, max_value=1.0, value=0.60, step=0.01,
             help="Si la probabilidad de 'Normal' es mayor o igual al umbral, se clasifica como Normal."
         )
+        st.session_state.ae_reconstruction_threshold = st.slider(
+            "Umbral Reconstrucción (AE)", min_value=0.0, max_value=1.0, value=0.02, step=0.001,
+            help="Si el error de reconstrucción es menor o igual al umbral, se considera normal (junto con el umbral de probabilidad)."
+        )
     selected = option_menu(
         "Navegación",
         ["Inicio", "Panel de Control", "Comparar Modelos"],
@@ -943,35 +947,48 @@ def show_dashboard_page():
                     predicciones = dbscan_predict(db, X)
 
                 if(model_option=='AUTOENCODER'):
-                    # Usar predict_proba para decidir Normal vs Ataque con umbral
+                    # Usar predict_proba + error de reconstrucción para decidir Normal vs Ataque con umbrales
                     proba = None
+                    est = None
                     try:
                         if hasattr(model, 'predict_proba'):
                             proba = model.predict_proba(data)
-                        else:
-                            est = getattr(model, 'named_steps', {}).get('autoencoder_classifier', None)
-                            if est is not None and hasattr(est, 'predict_proba'):
-                                proba = est.predict_proba(data)
+                        # Buscar estimador interno si es un Pipeline
+                        est = getattr(model, 'named_steps', {}).get('autoencoder_classifier', None)
+                        if proba is None and est is not None and hasattr(est, 'predict_proba'):
+                            proba = est.predict_proba(data)
                     except Exception:
                         proba = None
 
-                    if proba is not None and isinstance(proba, np.ndarray):
-                        normal_idx = 0
-                        thr = st.session_state.get('ae_normal_threshold', 0.60)
+                    # Calcular error de reconstrucción si es posible
+                    rec_err = None
+                    try:
+                        if hasattr(model, 'reconstruction_error'):
+                            rec_err = model.reconstruction_error(data)
+                        elif est is not None and hasattr(est, 'reconstruction_error'):
+                            rec_err = est.reconstruction_error(data)
+                    except Exception:
+                        rec_err = None
+
+                    normal_idx = 0
+                    thr = st.session_state.get('ae_normal_threshold', 0.60)
+                    rec_thr = st.session_state.get('ae_reconstruction_threshold', 0.02)
+                    if isinstance(proba, np.ndarray):
                         pred_list = []
-                        for row in proba:
-                            if row[normal_idx] >= thr:
+                        for i, row in enumerate(proba):
+                            is_normal_proba = row[normal_idx] >= thr
+                            is_normal_recon = (rec_err is not None and i < len(rec_err) and rec_err[i] <= rec_thr)
+                            if is_normal_proba and (rec_err is None or is_normal_recon):
                                 pred_list.append(0)
                             else:
                                 pred_list.append(int(np.argmax(row)))
                         predicciones = np.array(pred_list, dtype=int)
-                        scores = proba[:, normal_idx]
+                        scores = row[normal_idx] if 'row' in locals() else proba[:, normal_idx]
                     else:
                         # Fallback a predict si no hay proba
                         try:
                             predicciones = model.predict(data)
                         except Exception:
-                            est = getattr(model, 'named_steps', {}).get('autoencoder_classifier', None)
                             predicciones = est.predict(data) if est is not None else np.zeros(len(data), dtype=int)
                         scores = ""
 

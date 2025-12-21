@@ -67,3 +67,19 @@ class AutoencoderClassifier(BaseEstimator, ClassifierMixin):
     def predict_proba(self, X):
         _, y_pred = self.model.predict(X)
         return y_pred
+
+    def reconstruction_error(self, X):
+        """Return per-sample mean squared reconstruction error.
+        Uses the autoencoder's reconstruction output compared against X.
+        """
+        y_rec, _ = self.model.predict(X)
+        # Ensure shapes align
+        if y_rec.shape != X.shape:
+            # Try to coerce if possible; else fallback to zero error
+            try:
+                X_arr = np.asarray(X)
+                errs = np.mean((X_arr - y_rec)**2, axis=1)
+            except Exception:
+                errs = np.zeros(len(X))
+            return errs
+        return np.mean((X - y_rec)**2, axis=1)
