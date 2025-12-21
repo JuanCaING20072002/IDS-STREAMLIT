@@ -875,18 +875,24 @@ def show_dashboard_page():
         
         def predecir(model, data, model_option):
             try:
-                
-                
-                # Obtener las columnas desde el preprocesador
-                columns = model[0].named_steps['prepro_2_del']\
-                  .named_steps['prepro_1_num_cat']\
-                  .get_feature_names_out().tolist()
+                # Alinear columnas de entrada a lo esperado por el pipeline si es posible
+                expected_cols = None
+                if hasattr(model, 'feature_names_in_'):
+                    expected_cols = list(model.feature_names_in_)
+                elif hasattr(model, 'named_steps'):
+                    prepro = model.named_steps.get('prepro_2_del') or model.named_steps.get('preprocessor') or model.named_steps.get('preprocessor_3_pca')
+                    if prepro is not None and hasattr(prepro, 'get_feature_names_out'):
+                        try:
+                            expected_cols = list(prepro.get_feature_names_out())
+                        except Exception:
+                            expected_cols = None
 
-                # Reemplazar del_columns en el pipeline con la versión correcta
-                model[0].named_steps['prepro_2_del'].named_steps['del_columns'] = del_columns(columns)
-                # Asegurarse de que las columnas del DataFrame coincidan con las esperadas por el modelo
-                columnas=['number_delta_time',	'numbertcp_srcport',	'numbertcp_dstport',	'numberframe_len',	'numberudp_length',	'numberip_ttl',	'numbertos',	'numberip_flags_df',	'numberip_flags_mf',	'numbertcp_flags_ns',	'number_tcp_flags_syn','category__protocols'	]
-                
+                if expected_cols:
+                    for col in expected_cols:
+                        if col not in data.columns:
+                            data[col] = 0
+                    data = data[expected_cols]
+
                 columnas_pca2=['componente1','componente2','componente3','componente4','componente5','componente6']
 
                 #'category__protocols'
@@ -932,13 +938,31 @@ def show_dashboard_page():
                     predicciones = dbscan_predict(db, X)
 
                 if(model_option=='AUTOENCODER'):
-                    print("Aqui estan tus pesos: ", model.named_steps['autoencoder_classifier'].model.get_weights()[0].shape)
-                    predicciones=model.predict(data)
+                    # Usar predicción directa del pipeline/estimator del autoencoder
+                    try:
+                        predicciones = model.predict(data)
+                    except Exception:
+                        est = getattr(model, 'named_steps', {}).get('autoencoder_classifier', None)
+                        predicciones = est.predict(data) if est is not None else np.zeros(len(data), dtype=int)
                     scores=""
-                                
-                pp3 = model[0].transform(data)  # Transformar los datos para el modelo IForest
-                
-                pp3 = pd.DataFrame(pp3, columns=columnas_pca2)  # Convertir a DataFrame
+
+                # Construcción de pp3 condicionada a transformador disponible
+                pp3 = None
+                try:
+                    if model_option in ['IForest','OCSVM','LOF','DBSCAN']:
+                        transformer = None
+                        if hasattr(model, 'named_steps'):
+                            transformer = model.named_steps.get('preprocessor_3_pca') or model.named_steps.get('prepro_3_pca')
+                        if transformer is None and hasattr(model, '__getitem__'):
+                            transformer = model[0]
+                        if transformer is not None and hasattr(transformer, 'transform'):
+                            pp3_arr = transformer.transform(data)
+                            if isinstance(pp3_arr, np.ndarray) and pp3_arr.shape[1] == 6:
+                                pp3 = pd.DataFrame(pp3_arr, columns=columnas_pca2)
+                except Exception:
+                    pp3 = None
+                if pp3 is None:
+                    pp3 = data.select_dtypes(include=[np.number]).copy()
                 
                 # Añadir la columna de cluster al DataFrame
                 pp3['cluster'] = predicciones
