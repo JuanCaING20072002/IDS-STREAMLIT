@@ -12,6 +12,7 @@ import sklearn
 import sklearn.metrics as metrics
 from sklearn.metrics import auc, silhouette_score, calinski_harabasz_score, davies_bouldin_score
 from streamlit_option_menu import option_menu
+import sklearn
 import time
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, confusion_matrix, roc_auc_score, roc_curve
@@ -39,165 +40,33 @@ import psutil
 import time
 from autoencoder_classifier import AutoencoderClassifier
 
-# >>> RUTAS DE MODELOS (globales, visibles para todo el módulo)
-IFOREST_MODEL_PATHS = "model/iforest__EJERCICIO10_n_components6_fit.pkl"
-OCSVM_MODEL_PATH    = "model/ocsvm__EJERCICIO10_n_components6_fit.pkl"
-KMEANS_MODEL_PATHS  = "model/kmeans1__EJERCICIO10_n_components6_over.pkl"
-AUTOENCODER_MODEL_PATH = "model/autoencoder.pkl"
-KMEANS_TXT_PATH     = "model/list_kmeans_over.txt"
-
-def load_model(model_path):
-    try:
-        # Cargar el modelo usando joblib
-        model = joblib.load(model_path)
-        return model
-    except Exception as e:
-        st.error(f"Error al cargar el modelo: {str(e)}")
-        import traceback
-        st.error(f"Detalles del error: {traceback.format_exc()}")
-        return None
-
-def dict_predict(path2):
-    with open(path2, 'r') as f:
-        raw = f.read()
-    lista_tuplas = ast.literal_eval(raw)
-    return dict(lista_tuplas)
-
-def pred_threshold(score, threshold):
-    score = pd.Series(score)
-    Actual_pred = pd.DataFrame({'Pred': score})
-    Actual_pred['Pred'] = np.where(Actual_pred['Pred'] <= threshold, 0, 1)
-    return Actual_pred.reset_index(drop=True)
-
-def dbscan_predict(dbscan, X_new):
-    core_samples = dbscan.components_
-    core_labels = dbscan.labels_[dbscan.core_sample_indices_]
-    nn = NearestNeighbors(n_neighbors=1).fit(core_samples)
-    dist, idx = nn.kneighbors(X_new)
-    return np.where(dist.ravel() <= dbscan.eps, core_labels[idx.ravel()], -1)
-
-# IMPORTANTE: st.set_page_config debe ser la primera llamada a Streamlit en el script
-st.set_page_config(
-    page_title="Sistema IDS IoT - Detección de Intrusiones",
-    page_icon="🛡",
-    layout="wide",
-    initial_sidebar_state="expanded"
+from frontend.style import setup_page_and_style
+from frontend.home_page import show_home_page
+from frontend.auth_ui import ensure_auth
+from frontend.pdf_report import generar_reporte_pdf, DESCRIPCIONES_AMENAZAS
+from backend.constants import (
+    IFOREST_MODEL_PATHS,
+    OCSVM_MODEL_PATH,
+    KMEANS_MODEL_PATHS,
+    AUTOENCODER_MODEL_PATH,
+    KMEANS_TXT_PATH,
 )
-
-# Estilos CSS
-st.markdown(
-    """
-<style>
-    body { color: #ffffff; font-family: 'Roboto', sans-serif; }
-    .mi-caja label { color: black !important; }
-    .mi-caja input { color: black !important; background-color: white !important; caret-color: black !important; }
-    .main-header { font-family: 'Roboto', sans-serif; background: linear-gradient(90deg, #1E3D59 0%, #2E5077 100%); padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 30px; }
-    .metric-card { background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); margin: 10px 0; transition: transform 0.3s ease; }
-    .metric-card:hover { transform: translateY(-5px); }
-    .success-animation { animation: fadeInOut 3s forwards; }
-    @keyframes fadeInOut { 0% { opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; display: none; } }
-    .stAlert { background-color: rgba(25, 25, 25, 0.5); color: white; border: none; padding: 1rem; border-radius: 10px; }
-    .stButton > button { background: rgba(255, 255, 255, 0.1); border: none; color: #ffffff; padding: 10px 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08); transition: all 0.3s ease; }
-    .stButton > button:hover { background: rgba(255, 255, 255, 0.2); transform: translateY(-2px); box-shadow: 0 7px 14px rgba(0, 0, 0, 0.1), 0 3px 6px rgba(0, 0, 0, 0.08); }
-    .stButton > button:active { transform: translateY(1px); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08); }
-    .dashboard-form { background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); max-width: 600px; margin: auto; }
-    .notification { padding: 10px; border-radius: 5px; margin-bottom: 10px; animation: fadeOut 2s forwards; animation-delay: 3.5s; }
-    @keyframes fadeOut { from {opacity: 1;} to {opacity: 0; height: 0; padding: 0; margin: 0;} }
-    .streamlit-expanderHeader, .stTextInput > div > div > input { color: #ffffff !important; background-color: rgba(255, 255, 255, 0.1) !important; }
-    .stDataFrame { color: #ffffff; }
-    .card { background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); margin-bottom: 20px; }
-    .carousel { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }
-    .carousel-item { flex: none; scroll-snap-align: start; margin-right: 20px; }
-</style>
-    """,
-    unsafe_allow_html=True,
+from backend.model_utils import load_model, dict_predict, pred_threshold, dbscan_predict
+from backend.capture_utils import (
+    build_tshark_command,
+    capturing_packets,
+    type_packet,
+    packet_df,
 )
+from backend.predict import predecir, mostrar_metricas
 
-# ---------------------------- AUTENTICACIÓN ----------------------------
-from pathlib import Path
-import datetime as _dt
-import auth
+# Configuración de página y estilos (primera llamada a Streamlit)
+setup_page_and_style()
 
-auth.init_db()
+# (Estilos y configuración aplicados por setup_page_and_style)
+ensure_auth()
 
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-    st.session_state.username = None
-
-def _login_ui():
-    logo_path = Path(__file__).parent / "img" / "logo.png"
-    st.markdown("""
-        <div style="text-align:center; margin-top: 1rem;">
-            <h2>Acceso Administrador</h2>
-            <p>Ingrese sus credenciales y el código de acceso.</p>
-        </div>
-    """, unsafe_allow_html=True)
-    st.image(str(logo_path), width=160)
-
-    tabs = st.tabs(["Iniciar sesión", "Crear Admin", "Acerca de"])
-
-    with tabs[0]:
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            with st.form("login_form"):
-                u = st.text_input("Usuario", key="login_user")
-                p = st.text_input("Contraseña", type="password", key="login_pass")
-                code = st.text_input("Código de acceso (6 dígitos)", key="login_code", max_chars=6)
-                submitted = st.form_submit_button("Entrar")
-            if submitted:
-                ok, msg = auth.verify_login(u, p, code)
-                if ok:
-                    st.session_state.authenticated = True
-                    st.session_state.username = u
-                    st.success("Autenticación exitosa. Redirigiendo…")
-                    st.rerun()
-                else:
-                    st.error(msg)
-        with c2:
-            st.markdown("**Código de acceso**")
-            if st.button("Generar código", use_container_width=True):
-                code, exp = auth.generate_code(ttl_seconds=300)
-                st.session_state._last_code = code
-                st.session_state._last_exp = exp
-            code, exp = auth.get_current_code()
-            if code and exp:
-                remaining = int((exp - _dt.datetime.utcnow()).total_seconds())
-                remaining = max(0, remaining)
-                st.info(f"Código vigente: {code} | Expira en {remaining}s")
-            else:
-                st.warning("No hay código vigente. Genere uno para iniciar sesión.")
-
-    with tabs[1]:
-        admins = auth.get_admin_count()
-        if admins == 0:
-            st.info("No existe un administrador. Crea el primero.")
-            with st.form("create_admin_form"):
-                u = st.text_input("Usuario Admin")
-                p1 = st.text_input("Contraseña", type="password")
-                p2 = st.text_input("Confirmar contraseña", type="password")
-                create = st.form_submit_button("Crear Administrador")
-            if create:
-                if p1 != p2:
-                    st.error("Las contraseñas no coinciden")
-                else:
-                    ok, msg = auth.create_admin(u, p1)
-                    if ok:
-                        st.success(msg)
-                    else:
-                        st.error(msg)
-        else:
-            st.warning("Ya existe al menos un administrador. Inicia sesión para administrar usuarios.")
-
-    with tabs[2]:
-        st.markdown("""
-        - Solo usuarios Administradores pueden acceder al IDS.
-        - La autenticación requiere usuario, contraseña y un código de 6 dígitos con validez limitada.
-        - Usa el botón "Generar código" para producir un código temporal (expira en 5 minutos).
-        """)
-
-if not st.session_state.authenticated:
-    _login_ui()
-    st.stop()
+# Autenticación via módulo externo
 
 
 # ---------------------------------------------------- INICIO PAGE----------------------------------------------------------------------------------------------------------------------------
@@ -213,15 +82,6 @@ with st.sidebar:
             st.session_state.authenticated = False
             st.session_state.username = None
             st.rerun()
-        # Umbral de normalidad para Autoencoder
-        st.session_state.ae_normal_threshold = st.slider(
-            "Umbral Normal (Autoencoder)", min_value=0.0, max_value=1.0, value=0.60, step=0.01,
-            help="Si la probabilidad de 'Normal' es mayor o igual al umbral, se clasifica como Normal."
-        )
-        st.session_state.ae_reconstruction_threshold = st.slider(
-            "Umbral Reconstrucción (AE)", min_value=0.0, max_value=1.0, value=0.02, step=0.001,
-            help="Si el error de reconstrucción es menor o igual al umbral, se considera normal (junto con el umbral de probabilidad)."
-        )
     selected = option_menu(
         "Navegación",
         ["Inicio", "Panel de Control", "Comparar Modelos"],
@@ -237,370 +97,50 @@ with st.sidebar:
     else:
         st.session_state.page = "compare"
 
-def show_home_page():
-    # Hero Section con imagen principal
-    st.markdown("""
-    <div style="text-align: center; padding: 2rem 0; background: linear-gradient(135deg, #1E3D59 0%, #2E5077 100%); border-radius: 15px; margin-bottom: 2rem;">
-        <h1 style="color: white; font-size: 3rem; margin-bottom: 1rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
-            🛡️ Sistema de Detección de Intrusiones para IoT
-        </h1>
-        <h3 style="color: #B8D4E3; font-weight: 300; margin-bottom: 2rem;">
-            Protegiendo el futuro digital con inteligencia artificial avanzada
-        </h3>
-    </div>
-    """, unsafe_allow_html=True)
+    # Ubicar opciones avanzadas al final de la barra lateral
+    st.divider()
+    try:
+        with st.popover("⚙️ Opciones de desarrollador"):
+            st.caption(f"sklearn: {getattr(sklearn, '__version__', 'N/A')}")
+            st.session_state.ae_normal_threshold = st.slider(
+                "Umbral Normal (Autoencoder)", min_value=0.0, max_value=1.0, value=0.60, step=0.01,
+                help="Si la probabilidad de 'Normal' es mayor o igual al umbral, se clasifica como Normal."
+            )
+            st.session_state.ae_reconstruction_threshold = st.slider(
+                "Umbral Reconstrucción (AE)", min_value=0.0, max_value=1.0, value=0.02, step=0.001,
+                help="Si el error de reconstrucción es menor o igual al umbral, se considera normal (junto con el umbral de probabilidad)."
+            )
+            st.session_state.ocsvm_use_sign = st.toggle(
+                "OCSVM: usar predicción por signo",
+                value=True,
+                help="Usa labels del OCSVM (1=inlier, -1=outlier). Si se desactiva, se usa un umbral sobre decision_function."
+            )
+            st.session_state.ocsvm_percentile = st.slider(
+                "OCSVM percentil umbral", min_value=0.0, max_value=1.0, value=0.45, step=0.01,
+                help="Si se usa umbral, clasifica como normal si el score ≥ percentil seleccionado."
+            )
+    except Exception:
+        with st.expander("⚙️ Opciones de desarrollador", expanded=False):
+            st.caption(f"sklearn: {getattr(sklearn, '__version__', 'N/A')}")
+            st.session_state.ae_normal_threshold = st.slider(
+                "Umbral Normal (Autoencoder)", min_value=0.0, max_value=1.0, value=0.60, step=0.01,
+                help="Si la probabilidad de 'Normal' es mayor o igual al umbral, se clasifica como Normal."
+            )
+            st.session_state.ae_reconstruction_threshold = st.slider(
+                "Umbral Reconstrucción (AE)", min_value=0.0, max_value=1.0, value=0.02, step=0.001,
+                help="Si el error de reconstrucción es menor o igual al umbral, se considera normal (junto con el umbral de probabilidad)."
+            )
+            st.session_state.ocsvm_use_sign = st.toggle(
+                "OCSVM: usar predicción por signo",
+                value=True,
+                help="Usa labels del OCSVM (1=inlier, -1=outlier). Si se desactiva, se usa un umbral sobre decision_function."
+            )
+            st.session_state.ocsvm_percentile = st.slider(
+                "OCSVM percentil umbral", min_value=0.0, max_value=1.0, value=0.45, step=0.01,
+                help="Si se usa umbral, clasifica como normal si el score ≥ percentil seleccionado."
+            )
 
-    # Descripción principal mejorada
-    st.markdown("""
-    <div style="background: rgba(255, 255, 255, 0.05); padding: 2rem; border-radius: 15px; 
-                border-left: 4px solid #4CAF50; margin: 2rem 0;">
-        <p style="font-size: 1.2rem; line-height: 1.8; text-align: justify;">
-            Bienvenido al <strong>Sistema de Detección de Intrusiones en Redes IoT</strong>, 
-            una solución avanzada diseñada para monitorear y detectar anomalías 
-            en redes de IoT, brindando seguridad y confiabilidad sin precedentes. 
-        </p>
-        <p style="font-size: 1.1rem; line-height: 1.8; text-align: justify;">
-            Nuestro sistema utiliza modelos de vanguardia en detección de anomalías, como 
-            <strong>IForest</strong> (Isolation Forest), <strong>OCSVM</strong> (One Class Support Vector Machine),
-            <strong>K-MEANS</strong> y <strong>Autoencoder multiclase</strong> para analizar patrones complejos 
-            y alertar sobre posibles irregularidades en la red en tiempo real.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Sección de características principales con iconos
-    st.markdown("---")
-    st.markdown("""
-    <h2 style="text-align: center; color: #4CAF50; margin: 3rem 0 2rem 0;">
-        🎯 Características Principales del Sistema
-    </h2>
-    """, unsafe_allow_html=True)
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.markdown("""
-        <div class="feature-card" style="background: rgba(76, 175, 80, 0.1); padding: 1.5rem; 
-                    border-radius: 15px; text-align: center; height: 250px; 
-                    border: 1px solid rgba(76, 175, 80, 0.3);">
-            <div style="font-size: 3rem; margin-bottom: 1rem;">🔍</div>
-            <h4 style="color: #4CAF50;">Detección en Tiempo Real</h4>
-            <p style="font-size: 0.9rem;">Monitoreo continuo y análisis instantáneo de patrones de red</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class="feature-card" style="background: rgba(33, 150, 243, 0.1); padding: 1.5rem; 
-                    border-radius: 15px; text-align: center; height: 250px; 
-                    border: 1px solid rgba(33, 150, 243, 0.3);">
-            <div style="font-size: 3rem; margin-bottom: 1rem;">🧠</div>
-            <h4 style="color: #2196F3;">IA Avanzada</h4>
-            <p style="font-size: 0.9rem;">Algoritmos de machine learning de última generación</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
-        <div class="feature-card" style="background: rgba(255, 152, 0, 0.1); padding: 1.5rem; 
-                    border-radius: 15px; text-align: center; height: 250px; 
-                    border: 1px solid rgba(255, 152, 0, 0.3);">
-            <div style="font-size: 3rem; margin-bottom: 1rem;">📊</div>
-            <h4 style="color: #FF9800;">Análisis Predictivo</h4>
-            <p style="font-size: 0.9rem;">Predicción de amenazas y comportamientos anómalos</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown("""
-        <div class="feature-card" style="background: rgba(244, 67, 54, 0.1); padding: 1.5rem; 
-                    border-radius: 15px; text-align: center; height: 250px; 
-                    border: 1px solid rgba(244, 67, 54, 0.3);">
-            <div style="font-size: 3rem; margin-bottom: 1rem;">🚫</div>
-            <h4 style="color: #F44336;">Protección Activa</h4>
-            <p style="font-size: 0.9rem;">Identificación y mitigación automática de amenazas</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # Sección de interpretación de resultados mejorada
-    st.markdown("---")
-    st.markdown("""
-    <h2 style="text-align: center; color: #FF9800; margin: 3rem 0 2rem 0;">
-        💬 Interpretación de Resultados
-    </h2>
-    """, unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("""
-        <div style="background: rgba(76, 175, 80, 0.1); padding: 2rem; border-radius: 15px; 
-                    border-left: 4px solid #4CAF50; height: 350px;">
-            <h4 style="color: #4CAF50; text-align: center; margin-bottom: 1.5rem;">
-                🟢 Métricas de Validación
-            </h4>
-            <ul style="list-style-type: none; padding: 0;">
-                <li style="margin-bottom: 1rem; padding: 0.5rem; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                    <strong>Silhouette Score:</strong> Mide la calidad de los clusters (ideal > 0.5)
-                </li>
-                <li style="margin-bottom: 1rem; padding: 0.5rem; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                    <strong>Calinski Score:</strong> Evalúa la separación entre clusters
-                </li>
-                <li style="padding: 0.5rem; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                    <strong>Davies Score:</strong> Indica la similitud dentro de clusters
-                </li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div style="background: rgba(33, 150, 243, 0.1); padding: 2rem; border-radius: 15px; 
-                    border-left: 4px solid #2196F3; height: 450px;">
-            <h4 style="color: #2196F3; text-align: center; margin-bottom: 1.5rem;">
-                🔰 Clasificación de Anomalías
-            </h4>
-            <div style="margin-bottom: 1rem; padding: 0.8rem; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                <strong style="color: #4CAF50;">Normal:</strong> Tráfico de red esperado
-            </div>
-            <div style="margin-bottom: 1rem; padding: 0.8rem; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                <strong style="color: #FF5252;">Anómalo:</strong> Patrones sospechosos
-            </div>
-            <div style="padding: 0.8rem; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                <strong>Multiclase:</strong>
-                <ul style="margin-top: 0.5rem; padding-left: 1rem;">
-                    <li>DDoS_TCP</li>
-                    <li>DDoS_UDP</li>
-                    <li>Reconnaissance</li>
-                </ul>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
-        <div style="background: rgba(255, 152, 0, 0.1); padding: 2rem; border-radius: 15px; 
-                    border-left: 4px solid #FF9800; height: 350px;">
-            <h4 style="color: #FF9800; text-align: center; margin-bottom: 1.5rem;">
-                📈 Métricas de Rendimiento
-            </h4>
-            <ul style="list-style-type: none; padding: 0;">
-                <li style="margin-bottom: 1rem; padding: 0.5rem; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                    <strong>CPU:</strong> % Consumo por segundo
-                </li>
-                <li style="margin-bottom: 1rem; padding: 0.5rem; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                    <strong>Memoria:</strong> % Uso de RAM
-                </li>
-                <li style="margin-bottom: 1rem; padding: 0.5rem; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                    <strong>Disco:</strong> % Uso de almacenamiento
-                </li>
-                <li style="padding: 0.5rem; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                    <strong>Tiempo:</strong> Duración en segundos
-                </li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # Sección de modelos mejorada
-    st.markdown("---")
-    st.markdown("""
-    <h2 style="text-align: center; color: #9C27B0; margin: 3rem 0 2rem 0;">
-        🔎 Modelos de Detección de Anomalías
-    </h2>
-    """, unsafe_allow_html=True)
-    
-    # Grid de modelos con diseño mejorado
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        with st.expander("🔵 OCSVM (One Class Support Vector Machine)", expanded=False):
-            st.markdown("""
-            <div style="background: rgba(63, 81, 181, 0.1); padding: 1.5rem; border-radius: 10px; margin: 1rem 0;">
-                <p style="text-align: justify; line-height: 1.6;">
-                El modelo OCSVM es un algoritmo de detección de anomalías basado en Support Vector Machine (SVM), 
-                que funciona creando una frontera en el espacio de características que agrupa la mayor parte 
-                de los datos de entrenamiento como normales y considera como anomalías aquellas muestras que 
-                queden fuera de esta región.
-                </p>
-                <div style="background: rgba(76, 175, 80, 0.2); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-                    <strong style="color: #4CAF50;">✅ Ventajas:</strong> Efectivo para datos de alta dimensionalidad
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with st.expander("🟠 K-means", expanded=False):
-            st.markdown("""
-            <div style="background: rgba(255, 152, 0, 0.1); padding: 1.5rem; border-radius: 10px; margin: 1rem 0;">
-                <p style="text-align: justify; line-height: 1.6;">
-                El modelo K-means es un algoritmo de agrupamiento que tiene como objetivo dividir un conjunto 
-                de datos en grupos que sean lo más similares posible internamente y los grupos sean entre sí 
-                lo más distintos posible.
-                </p>
-                <div style="background: rgba(76, 175, 80, 0.2); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-                    <strong style="color: #4CAF50;">✅ Ventajas:</strong> Rápido y eficiente para grandes datasets
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    with col2:
-        with st.expander("🟢 IForest (Isolation Forest)", expanded=False):
-            st.markdown("""
-            <div style="background: rgba(76, 175, 80, 0.1); padding: 1.5rem; border-radius: 10px; margin: 1rem 0;">
-                <p style="text-align: justify; line-height: 1.6;">
-                El modelo IForest utiliza árboles de aislamiento para identificar puntos de datos anómalos. 
-                Es eficiente y efectivo para detectar anomalías en grandes conjuntos de datos mediante el 
-                principio de que las anomalías son más fáciles de aislar que los puntos normales.
-                </p>
-                <div style="background: rgba(76, 175, 80, 0.2); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-                    <strong style="color: #4CAF50;">✅ Ventajas:</strong> Escalable y robusto contra outliers
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with st.expander("🔴 Autoencoder multiclase", expanded=False):
-            st.markdown("""
-            <div style="background: rgba(244, 67, 54, 0.1); padding: 1.5rem; border-radius: 10px; margin: 1rem 0;">
-                <p style="text-align: justify; line-height: 1.6;">
-                Este modelo combina un autoencoder tradicional con una capa de clasificación supervisada, 
-                formando un único grafo computacional que optimiza simultáneamente la reconstrucción de 
-                entrada y la predicción de su etiqueta.
-                </p>
-                <div style="background: rgba(76, 175, 80, 0.2); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-                    <strong style="color: #4CAF50;">✅ Ventajas:</strong> Combina detección y clasificación
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    # Guía de uso mejorada
-    st.markdown("---")
-    st.markdown("""
-    <h2 style="text-align: center; color: #E91E63; margin: 3rem 0 2rem 0;">
-        📖 Guía de Uso del Sistema
-    </h2>
-    """, unsafe_allow_html=True)
-    
-    # Timeline de pasos
-    steps = [
-        {"icon": "🔌", "title": "Seleccionar Modelo", "desc": "Elige el algoritmo de detección más adecuado", "color": "#2196F3"},
-        {"icon": "📡", "title": "Capturar Paquetes", "desc": "Inicia la captura de tráfico de red", "color": "#4CAF50"},
-        {"icon": "🖱️", "title": "Realizar Predicción", "desc": "Ejecuta el análisis con un solo clic", "color": "#FF9800"},
-        {"icon": "📊", "title": "Visualizar Resultados", "desc": "Examina gráficos interactivos y métricas", "color": "#9C27B0"},
-        {"icon": "💾", "title": "Guardar Resultados", "desc": "Exporta los datos en formato CSV", "color": "#F44336"}
-    ]
-    
-    for i, step in enumerate(steps, 1):
-        st.markdown(f"""
-        <div style="display: flex; align-items: center; margin: 1.5rem 0; 
-                    background: rgba(255, 255, 255, 0.05); padding: 1.5rem; border-radius: 15px;
-                    border-left: 4px solid {step['color']};">
-            <div style="font-size: 3rem; margin-right: 2rem; min-width: 80px; text-align: center;">
-                {step['icon']}
-            </div>
-            <div>
-                <h4 style="color: {step['color']}; margin-bottom: 0.5rem;">
-                    Paso {i}: {step['title']}
-                </h4>
-                <p style="margin: 0; font-size: 1.1rem; opacity: 0.9;">
-                    {step['desc']}
-                </p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # Sección de tipos de resultados mejorada
-    st.markdown("---")
-    st.markdown("""
-    <h2 style="text-align: center; color: #795548; margin: 3rem 0 2rem 0;">
-        📊 Tipos de Resultados y Recomendaciones
-    </h2>
-    """, unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%); 
-                    padding: 2rem; border-radius: 15px; height: 465px; color: white;">
-            <div style="text-align: center; font-size: 4rem; margin-bottom: 1rem;">✅</div>
-            <h4 style="text-align: center; margin-bottom: 1.5rem;">Resultados Normales</h4>
-            <p style="text-align: justify; line-height: 1.6; margin-bottom: 1.5rem;">
-                Los datos han sido clasificados como normales. No se han detectado anomalías significativas 
-                en el tráfico de red analizado.
-            </p>
-            <div style="background: rgba(255,255,255,0.2); padding: 1rem; border-radius: 8px;">
-                <strong>💡 Recomendación:</strong><br>
-                Continúa monitoreando la red regularmente para mantener la seguridad.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #FF9800 0%, #FFC107 100%); 
-                    padding: 2rem; border-radius: 15px; height: 465px; color: white;">
-            <div style="text-align: center; font-size: 4rem; margin-bottom: 1rem;">⚠️</div>
-            <h4 style="text-align: center; margin-bottom: 1.5rem;">Resultados Anómalos</h4>
-            <p style="text-align: justify; line-height: 1.6; margin-bottom: 1.5rem;">
-                Se han detectado patrones anómalos en la red. Esto puede indicar posibles amenazas 
-                o comportamientos inusuales que requieren atención.
-            </p>
-            <div style="background: rgba(255,255,255,0.2); padding: 1rem; border-radius: 8px;">
-                <strong>🔍 Recomendación:</strong><br>
-                Investiga las anomalías detectadas y toma medidas preventivas inmediatas.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #F44336 0%, #E91E63 100%); 
-                    padding: 2rem; border-radius: 15px; height: 465px; color: white; overflow-y: auto;">
-            <div style="text-align: center; font-size: 4rem; margin-bottom: 1rem;">🚨</div>
-            <h4 style="text-align: center; margin-bottom: 1.5rem;">Ataques Específicos</h4>
-            <!-- Tarjeta DDoS_TCP -->
-            <div style="background:#ff5c5c;padding:1rem;border-radius:1rem;margin-bottom:1rem;color:white;">
-                <strong>🔴 DDoS_TCP:</strong>
-                <ul style="font-size: 0.9rem; margin-top: 0.5rem;">
-                    <li>Activa SYN cookies</li>
-                    <li>Configura límites de tasa</li>
-                    <li>Usa ACL para bloquear IPs</li>
-                </ul>
-            </div>
-            <!-- Tarjeta DDoS_UDP -->
-            <div style="background:#ffb300;padding:1rem;border-radius:1rem;margin-bottom:1rem;color:white;">
-                <strong>🟠 DDoS_UDP:</strong>
-                <ul style="font-size: 0.9rem; margin-top: 0.5rem;">
-                    <li>Permite solo puertos necesarios</li>
-                    <li>Aplica límites de tasa UDP</li>
-                    <li>Usa null routing</li>
-                </ul>
-            </div>
-            <!-- Tarjeta Reconnaissance -->
-            <div style="background:#2196f3;padding:1rem;border-radius:1rem;color:white;">
-                <strong>🔵 Reconnaissance:</strong>
-                <ul style="font-size: 0.9rem; margin-top: 0.5rem;">
-                    <li>Restringe respuestas ICMP</li>
-                    <li>Expón solo puertos necesarios</li>
-                    <li>Configura límites anti-scan</li>
-                </ul>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # Call-to-action mejorado
-    st.markdown("---")
-    st.markdown("""
-    <div style="text-align: center; background: linear-gradient(135deg, #1E3D59 0%, #2E5077 100%); 
-                padding: 3rem; border-radius: 20px; margin: 3rem 0;">
-        <h3 style="color: white; margin-bottom: 1.5rem;">¿Listo para comenzar?</h3>
-        <p style="color: #B8D4E3; font-size: 1.2rem; margin-bottom: 2rem;">
-            Dirígete al Panel de Control para empezar a proteger tu red IoT
-        </p>
-        <div style="font-size: 2rem;">🚀</div>
-    </div>
-    """, unsafe_allow_html=True)
+# ...existing code...
 
 #---------------------------------------------------- DASHBOARD ----------------------------------------------------------------------------------------------------------------------------
 # DistanceMetric.get_metric("euclidean") devuelve un objeto cuya clase interna
@@ -671,20 +211,7 @@ def show_dashboard_page():
     # Usar rutas globales: IFOREST_MODEL_PATHS, OCSVM_MODEL_PATH, KMEANS_MODEL_PATHS, AUTOENCODER_MODEL_PATH
 
 
-    def load_model(model_path):
-        try:
-            absolute_path = os.path.abspath(model_path)
-            st.write(f"Intentando cargar desde: {absolute_path}")
-            if not os.path.exists(absolute_path):
-                raise FileNotFoundError(f"El archivo {absolute_path} no se encuentra.")
-            model = joblib.load(absolute_path)
-            st.write(f"Tipo del modelo cargado: {type(model)}")
-            return model
-        except Exception as e:
-            st.error(f"Error al cargar el modelo: {str(e)}")
-            import traceback
-            st.error(f"Detalles del error: {traceback.format_exc()}")
-            return None
+    # load_model importado desde backend.model_utils
 
     col1, col2 = st.columns([1, 2])
 
@@ -728,325 +255,62 @@ def show_dashboard_page():
             help="Cada modelo utiliza diferentes técnicas para detectar anomalías"
         )
 
-        # ---------------- Captura automática ----------------
-        st.title(" ⚙️ Captura automática ")
-        col_auto_a, col_auto_b = st.columns(2)
-        with col_auto_a:
-            _default_dur_min = max(1, int(st.session_state.auto_capture['duration_sec'] // 60))
-            _val_dur_min = st.number_input(
-                'Duración de captura (minutos)', min_value=1, max_value=1440, value=_default_dur_min, step=1,
-                help='La captura automática finalizará cuando se cumpla este tiempo'
-            )
-            st.session_state.auto_capture['duration_sec'] = int(_val_dur_min * 60)
-        with col_auto_b:
-            _default_minutes = max(1, int(st.session_state.auto_capture['interval_sec'] // 60))
-            _val_minutes = st.number_input(
-                'Intervalo entre capturas (minutos)', min_value=1, max_value=1440, value=_default_minutes, step=1,
-                help='Pausa (en minutos) entre el fin de una captura y el inicio de la siguiente'
-            )
-            st.session_state.auto_capture['interval_sec'] = int(_val_minutes * 60)
-            auto_status = '🟢 Activa' if st.session_state.auto_capture['active'] else '🔴 Detenida'
-            st.metric('Estado', auto_status)
+        # Pestañas justo debajo del formulario (Automática por defecto, Manual)
+        tab_auto, tab_manual = st.tabs(["🚀 Captura automática", "🖐️ Captura manual"])
 
-        col_btn_a, col_btn_b = st.columns(2)
-        with col_btn_a:
-            if st.button('▶️ Iniciar automática', use_container_width=True, disabled=st.session_state.auto_capture['active']):
-                st.session_state.auto_capture['active'] = True
-                st.session_state.auto_capture['stop_requested'] = False
-                # Ejecutar inmediatamente la primera
-                st.session_state.auto_capture['next_run_ts'] = time.time()
-                st.rerun()
-        with col_btn_b:
-            if st.button('⏹️ Detener automática', use_container_width=True, disabled=not st.session_state.auto_capture['active']):
-                st.session_state.auto_capture['stop_requested'] = True
-                st.session_state.auto_capture['active'] = False
-                st.session_state.auto_capture['next_run_ts'] = None
+        # ---------------- Captura automática (en pestaña) ----------------
+        with tab_auto:
+            st.title("⚙️ Captura automática")
+            col_auto_a, col_auto_b = st.columns(2)
+            with col_auto_a:
+                _default_dur_min = max(1, int(st.session_state.auto_capture['duration_sec'] // 60))
+                _val_dur_min = st.number_input(
+                    'Duración de captura (minutos)', min_value=1, max_value=1440, value=_default_dur_min, step=1,
+                    help='La captura automática finalizará cuando se cumpla este tiempo'
+                )
+                st.session_state.auto_capture['duration_sec'] = int(_val_dur_min * 60)
+            with col_auto_b:
+                _default_minutes = max(1, int(st.session_state.auto_capture['interval_sec'] // 60))
+                _val_minutes = st.number_input(
+                    'Intervalo entre capturas (minutos)', min_value=1, max_value=1440, value=_default_minutes, step=1,
+                    help='Pausa (en minutos) entre el fin de una captura y el inicio de la siguiente'
+                )
+                st.session_state.auto_capture['interval_sec'] = int(_val_minutes * 60)
+                auto_status = '🟢 Activa' if st.session_state.auto_capture['active'] else '🔴 Detenida'
+                st.metric('Estado', auto_status)
 
-        # Countdown/estado próximo ciclo
-        if st.session_state.auto_capture['active'] and not st.session_state.auto_capture['is_capturing']:
-            if st.session_state.auto_capture['next_run_ts'] is not None:
-                remaining = max(0, int(st.session_state.auto_capture['next_run_ts'] - time.time()))
-                if remaining > 0:
-                    m, s = divmod(remaining, 60)
-                    st.info(f"⏳ Próxima captura en {m:02d}:{s:02d} min:s")
-                    # Refrescar para avanzar el conteo
-                    time.sleep(1)
+            col_btn_a, col_btn_b = st.columns(2)
+            with col_btn_a:
+                if st.button('▶️ Iniciar automática', use_container_width=True, disabled=st.session_state.auto_capture['active']):
+                    st.session_state.auto_capture['active'] = True
+                    st.session_state.auto_capture['stop_requested'] = False
+                    # Ejecutar inmediatamente la primera
+                    st.session_state.auto_capture['next_run_ts'] = time.time()
                     st.rerun()
+            with col_btn_b:
+                if st.button('⏹️ Detener automática', use_container_width=True, disabled=not st.session_state.auto_capture['active']):
+                    st.session_state.auto_capture['stop_requested'] = True
+                    st.session_state.auto_capture['active'] = False
+                    st.session_state.auto_capture['next_run_ts'] = None
+
+            # Countdown/estado próximo ciclo
+            if st.session_state.auto_capture['active'] and not st.session_state.auto_capture['is_capturing']:
+                if st.session_state.auto_capture['next_run_ts'] is not None:
+                    remaining = max(0, int(st.session_state.auto_capture['next_run_ts'] - time.time()))
+                    if remaining > 0:
+                        m, s = divmod(remaining, 60)
+                        st.info(f"⏳ Próxima captura en {m:02d}:{s:02d} min:s")
+                        # Refrescar para avanzar el conteo
+                        time.sleep(1)
+                        st.rerun()
         
         
-        # Función para procesar los paquetes capturados
-        # ----------------------------------------------
-        # Configuración del comando para Tshark
-        comm_arg =  (
-    "sudo /usr/local/bin/tshark "
-    "-i eth0 -i wlan0 "
-    "-l "
-    "-Y 'eth.type != 0x8899' "
-    # filtro de captura:
-    "-f \"tcp or udp or arp\" "
-    "-f \"arp or icmp or (udp and not port 53 and not port 5353) or (tcp and not port 443)\" "
-    "-T fields -E separator=/t "
-    "-e frame.time_delta "
-    "-e _ws.col.Protocol "
-    "-e ip.src -e ip.dst "
-    "-e arp.src.proto_ipv4 -e arp.dst.proto_ipv4 "
-    "-e ipv6.src -e ipv6.dst "
-    "-e eth.src -e eth.dst "
-    "-e tcp.srcport -e tcp.dstport "
-    "-e udp.srcport -e udp.dstport "
-    "-e frame.len -e udp.length "
-    "-e ip.ttl -e icmp.type "
-    "-e ip.dsfield.dscp -e ip.flags.rb -e ip.flags.df -e ip.flags.mf "
-    "-e tcp.flags.res -e tcp.flags.ns -e tcp.flags.cwr -e tcp.flags.ecn "
-    "-e tcp.flags.urg -e tcp.flags.ack -e tcp.flags.push -e tcp.flags.reset "
-    "-e tcp.flags.syn -e tcp.flags.fin -e ip.version "
-    "-e frame.time_epoch"
-)
-
-        comm_arg = shlex.split(comm_arg)
-
-        # Función para capturar paquetes
-        def capturing_packets(comm_arg):
-            process = Popen(comm_arg, stdout=PIPE, stderr=PIPE, text=True)
-            return process
-
-        # Función para transformar los paquetes en el formato correcto
-        def type_packet(packet_):
-            if len(packet_) < 34:  # Rellenar con valores vacíos si falta información
-                packet_ += [''] * (34 - len(packet_))
-
-            
-            if packet_[1] == 'TCP' or packet_[1] == 'SSH' or packet_[1] == 'SSHv2' or packet_[1] == 'SSHv2' or packet_[1] == 'TLSv1.2' or packet_[1] == 'HTTP':
-                tcp_src = packet_[10]  # campo tcp.srcport
-                tcp_dst = packet_[11]  # campo tcp.dstport
-            elif packet_[1] == 'UDP' or packet_[1]=='DNS' or packet_[1]=='BROWSER' or packet_[1]=='DHCP' :
-                tcp_src = packet_[12]  # reasignación de udp.srcport a tcp.srcport
-                tcp_dst = packet_[13]  # reasignación de udp.dstport a tcp.dstport
-            else:
-                tcp_src = ''
-                tcp_dst = ''
-
-                
-            if packet_[1] == 'ARP':
-                packet_[2] = packet_[4]  # ip.src <- arp.src.proto_ipv4
-                packet_[3] = packet_[5]  # ip.dst <- arp.dst.proto_ipv4
-
-            # Mapeo de IPv6 al campo IP src y dst
-            if packet_[32] == '6':
-                packet_[2] = packet_[6]  # ip.src <- ipv6.src
-                packet_[3] = packet_[7]  # ip.dst <- ipv6.dst
-
- 
-
-            # Reemplazo de comas por puntos en ciertos campos
-            for index in [16, 18, 19, 20, 21]:
-                if packet_[index]:
-                    packet_[index] = packet_[index].replace(',', '.')
-
-            # Estructura del paquete ordenado
-            #ordered_packet = [
-                #packet_[0], packet_[1],tcp_src, tcp_dst, packet_[10], packet_[11], packet_[14],
-                #packet_[15], packet_[16], packet_[17], packet_[18], packet_[19], packet_[20], packet_[21],
-                #packet_[22], packet_[23], packet_[24], packet_[25], packet_[26], packet_[27], packet_[28],
-                #packet_[29], packet_[30], packet_[31], packet_[32]
-            #]
-
-            ordered_packet = [
-                packet_[0], packet_[1], packet_[2],packet_[3],tcp_src, tcp_dst,packet_[14], packet_[15],
-                packet_[16], packet_[17], packet_[18], packet_[19], packet_[20], packet_[21], packet_[22],
-                packet_[23], packet_[24], packet_[25], packet_[26], packet_[27], packet_[28], packet_[29],
-                packet_[30], packet_[31], packet_[33]
-            ]
-
-
-            fieldnames = [
-                'delta_time', 'protocols','ip_src','ip_dst','port_src', 'port_dst', 'frame_len',
-                'udp_len', 'ip_ttl', 'icmp_type', 'tos', 'ip_flags_rb', 'ip_flags_df', 'ip_flags_mf',
-                'tcp_flags_res', 'tcp_flags_ns', 'tcp_flags_cwr', 'tcp_flags_ecn', 'tcp_flags_urg',
-                'tcp_flags_ack', 'tcp_flags_push', 'tcp_flags_reset', 'tcp_flags_syn', 'tcp_flags_fin','epoch_time'
-            ]
-
-            return {fieldnames[i]: [ordered_packet[i]] for i in range(len(fieldnames))}
-
-        # Función para agregar los paquetes al DataFrame
-        def packet_df(type_packet, df):
-            df_temp = pd.DataFrame(type_packet)
-            if list(df_temp.columns) == ['value']:
-                return df  # Ignorar tablas value
-            if df is None:
-                df = df_temp
-            else:
-                df = pd.concat([df, df_temp], axis=0, ignore_index=True)
-            # Si después de concatenar solo queda la columna value, devolver None
-            if list(df.columns) == ['value']:
-                return None
-            return df
+        # Comando y utilidades de captura desde backend.capture_utils
+        comm_arg = build_tshark_command()
         
-        def predecir(model, data, model_option):
-            try:
-                # Alinear columnas de entrada a lo esperado por el pipeline si es posible
-                expected_cols = None
-                if hasattr(model, 'feature_names_in_'):
-                    expected_cols = list(model.feature_names_in_)
-                elif hasattr(model, 'named_steps'):
-                    prepro = model.named_steps.get('prepro_2_del') or model.named_steps.get('preprocessor') or model.named_steps.get('preprocessor_3_pca')
-                    if prepro is not None and hasattr(prepro, 'get_feature_names_out'):
-                        try:
-                            expected_cols = list(prepro.get_feature_names_out())
-                        except Exception:
-                            expected_cols = None
-
-                if expected_cols:
-                    for col in expected_cols:
-                        if col not in data.columns:
-                            data[col] = 0
-                    data = data[expected_cols]
-
-                columnas_pca2=['componente1','componente2','componente3','componente4','componente5','componente6']
-
-                #'category__protocols'
-                if(model_option=='IForest'):
-                    scores = model.decision_function(data)
-                    predicciones=pred_threshold(scores, -0.10)
-                    
-                if(model_option=='LOF'):
-                    scores = model.decision_function(data)
-                    threshold = np.percentile(scores, 100 * 0.2)
-                    st.write(threshold)
-                    predicciones = np.where(scores >= threshold,0,1)
-
-                if(model_option=='OCSVM'):
-                    scores = model.decision_function(data)
-                    threshold = np.percentile(scores, 100 * 0.45)
-                    st.write(threshold)
-                    predicciones = np.where(scores >= threshold,0,1)
-                    #predicciones1=model.predict(data)
-                    #predicciones=np.where(predicciones1 == 1, 0, 1)
-                    #scores = model.decision_function(data)
-                    #predicciones=pred_threshold(scores, 16000.512)
-                if(model_option=='KMEANS'):
-                    scores=""
-                    predicciones=model.predict(data)
-                    
-                #if(model_option=='DBSCAN'):
-                    #preproc = model.named_steps['preprocessor_3_pca']
-                    #X = preproc.transform(data) # → pp3
-                    #est = model.named_steps['dbscan']
-                    #predicciones = est.fit_predict(X)
-                    
-                if model_option == 'DBSCAN':
-                # 1) Transformación previa (PCA, escalado, etc.)
-                    scores=""
-                    preproc = model.named_steps['preprocessor_3_pca']
-                    X = preproc.transform(data)  # → pp3
-
-                    # 2) DBSCAN ya entrenado (lo cargaste con joblib)
-                    db = model.named_steps['dbscan']
-
-                    # 3) Asignación de etiquetas sin refit
-                    predicciones = dbscan_predict(db, X)
-
-                if(model_option=='AUTOENCODER'):
-                    # Usar predict_proba + error de reconstrucción para decidir Normal vs Ataque con umbrales
-                    proba = None
-                    est = None
-                    try:
-                        if hasattr(model, 'predict_proba'):
-                            proba = model.predict_proba(data)
-                        # Buscar estimador interno si es un Pipeline
-                        est = getattr(model, 'named_steps', {}).get('autoencoder_classifier', None)
-                        if proba is None and est is not None and hasattr(est, 'predict_proba'):
-                            proba = est.predict_proba(data)
-                    except Exception:
-                        proba = None
-
-                    # Calcular error de reconstrucción si es posible
-                    rec_err = None
-                    try:
-                        if hasattr(model, 'reconstruction_error'):
-                            rec_err = model.reconstruction_error(data)
-                        elif est is not None and hasattr(est, 'reconstruction_error'):
-                            rec_err = est.reconstruction_error(data)
-                    except Exception:
-                        rec_err = None
-
-                    normal_idx = 0
-                    thr = st.session_state.get('ae_normal_threshold', 0.60)
-                    rec_thr = st.session_state.get('ae_reconstruction_threshold', 0.02)
-                    if isinstance(proba, np.ndarray):
-                        pred_list = []
-                        for i, row in enumerate(proba):
-                            is_normal_proba = row[normal_idx] >= thr
-                            is_normal_recon = (rec_err is not None and i < len(rec_err) and rec_err[i] <= rec_thr)
-                            if is_normal_proba and (rec_err is None or is_normal_recon):
-                                pred_list.append(0)
-                            else:
-                                pred_list.append(int(np.argmax(row)))
-                        predicciones = np.array(pred_list, dtype=int)
-                        scores = row[normal_idx] if 'row' in locals() else proba[:, normal_idx]
-                    else:
-                        # Fallback a predict si no hay proba
-                        try:
-                            predicciones = model.predict(data)
-                        except Exception:
-                            predicciones = est.predict(data) if est is not None else np.zeros(len(data), dtype=int)
-                        scores = ""
-
-                # Construcción de pp3 condicionada a transformador disponible
-                pp3 = None
-                try:
-                    if model_option in ['IForest','OCSVM','LOF','DBSCAN']:
-                        transformer = None
-                        if hasattr(model, 'named_steps'):
-                            transformer = model.named_steps.get('preprocessor_3_pca') or model.named_steps.get('prepro_3_pca')
-                        if transformer is None and hasattr(model, '__getitem__'):
-                            transformer = model[0]
-                        if transformer is not None and hasattr(transformer, 'transform'):
-                            pp3_arr = transformer.transform(data)
-                            if isinstance(pp3_arr, np.ndarray) and pp3_arr.shape[1] == 6:
-                                pp3 = pd.DataFrame(pp3_arr, columns=columnas_pca2)
-                except Exception:
-                    pp3 = None
-                if pp3 is None:
-                    pp3 = data.select_dtypes(include=[np.number]).copy()
-                
-                # Añadir la columna de cluster al DataFrame
-                pp3['cluster'] = predicciones
-                
-                
-                return pp3, predicciones,scores
-                
-            except Exception as e:
-                st.error(f"Error en la predicción: {str(e)}")
-                import traceback
-                st.error(f"Detalles: {traceback.format_exc()}")
-                return None, None, None
+        # Funciones de predicción y métricas importadas desde backend.predict
         
-        def mostrar_metricas(silhouette, calinski, davies):
-          
-           # Mostrar métricas en cards
-            st.markdown("### 📊 Métricas Internas")
-            cols = st.columns(3)
-            with cols[0]:
-                st.metric(
-                    "Silhouette Score",
-                    f"{silhouette:.3f}",
-                    delta="Bueno" if silhouette > 0.5 else "Regular"
-                )
-            with cols[1]:
-                st.metric(
-                    "Calinski Score",
-                    f"{calinski:.3f}",
-                    delta="Bueno" if calinski > 1000 else "Regular"
-                )
-            with cols[2]:
-                st.metric(
-                    "Davies Score",
-                    f"{davies:.3f}",
-                    delta="Bueno" if davies < 0.5 else "Regular"
-                )     
-                            
-                     
+        # mostrar_metricas importado desde backend.predict
 
         # Función para guardar los paquetes en CSV
         def save_packet_csv(df, path):
@@ -1135,11 +399,30 @@ def show_dashboard_page():
                 fig.update_layout(title='Distribución de Detecciones', title_x=0.5)
                 st.plotly_chart(fig, use_container_width=True)
 
+                # Diagnóstico adicional para OCSVM: distribución de scores y umbral
+                if model_option == 'OCSVM' and isinstance(scores, (np.ndarray, list)) and len(scores) > 0:
+                    try:
+                        thr = None
+                        if not st.session_state.get('ocsvm_use_sign', True):
+                            pct = float(st.session_state.get('ocsvm_percentile', 0.45))
+                            thr = np.percentile(scores, 100 * pct)
+                        hist_fig = go.Figure()
+                        hist_fig.add_trace(go.Histogram(x=scores, nbinsx=30, marker_color='#4B9FE1', name='decision_function'))
+                        if thr is not None:
+                            hist_fig.add_shape(type='line', x0=thr, x1=thr, y0=0, y1=1, xref='x', yref='paper', line=dict(color='#FF5252', width=2))
+                            hist_fig.add_annotation(x=thr, y=1, yref='paper', text=f"Umbral={thr:.3f}", showarrow=True, arrowhead=1)
+                        hist_fig.update_layout(title='OCSVM: distribución de decision_function', title_x=0.5)
+                        st.plotly_chart(hist_fig, use_container_width=True)
+                    except Exception:
+                        pass
+
                 if metric_option == 'Internas':
                     unique_labels = np.unique(y_pred)
                     if len(unique_labels) >= 2:
                         silhouette, calinski, davies = metricas.metrica_internas(pp3, y_pred)
                         mostrar_metricas(silhouette, calinski, davies)
+                    else:
+                        st.info("Las métricas internas requieren al menos dos clases en la predicción. Actualmente todas las muestras pertenecen a una sola clase.")
 
                 # Métricas de recursos
                 tiempo_total = time.time() - start_time
@@ -1156,17 +439,13 @@ def show_dashboard_page():
             except Exception as e:
                 st.error(f"❌ Error en la predicción automática: {str(e)}")
 
-        # Streamlit UI
-        st.title("🔍 Captura y Análisis de Tráfico de Red")
-
-        traffic_method = st.selectbox(
-            "📌 Seleccione el método de tráfico",
-            ('Iniciar captura de paquetes', 'Abrir captura de paquetes pcap')
-        )
+        # Streamlit UI (contenido de pestañas)
 
         data = None  # Inicializamos el DataFrame
 
-        if traffic_method == 'Iniciar captura de paquetes':
+        # ---------------- Pestaña: Captura manual ----------------
+        with tab_manual:
+            st.title("🖐️ Captura manual")
 
             # Parámetros manuales
             col_man_a, col_man_b = st.columns(2)
@@ -1176,8 +455,7 @@ def show_dashboard_page():
                 manual_duration_min = st.number_input('Duración máx. (min) (manual)', min_value=0, max_value=1440, value=0, step=1)
             manual_duration = int(manual_duration_min * 60)
            
-
-            if st.button("🚀 Iniciar Captura"):
+            if st.button("🚀 Iniciar Captura", key="btn_manual_capture"):
                 process = capturing_packets(comm_arg)
                 st.write("📡 Capturando paquetes...")
 
@@ -1216,6 +494,8 @@ def show_dashboard_page():
                     if st.button("💾 Guardar en CSV"):
                         save_packet_csv(captured_data, "captura_paquetes.csv")
 
+        # ---------------- Pestaña: Captura automática ----------------
+        with tab_auto:
             # Ejecución automática si está activa y toca ciclo
             if st.session_state.auto_capture['active'] and not st.session_state.auto_capture['is_capturing']:
                 due = st.session_state.auto_capture['next_run_ts'] is not None and time.time() >= st.session_state.auto_capture['next_run_ts']
@@ -1298,32 +578,36 @@ def show_dashboard_page():
             else:
                 st.warning("⚠ Por favor capture paquetes o cargue un archivo CSV antes de realizar la predicción.")
 
-        # Guardar resultados en CSV
-        st.markdown("### 💾 Guardar Resultados")
-        LABEL = "Ingresa el nombre para tu archivo" 
-        
-        # 2. Abrimos el div contenedor
-        st.markdown('<div class="mi-caja">', unsafe_allow_html=True)
+        # Descargar reporte PDF de la última predicción
+        st.markdown("### 📄 Descargar Reporte PDF")
+        if st.session_state.get('prediccion_realizada') and 'resumen_prediccion' in st.session_state:
+            resumen = st.session_state['resumen_prediccion']
+            # Crear gráfica de barras solo para el PDF (no afecta la UI de torta)
+            fig_bar, ax = plt.subplots(figsize=(6, 3.5))
+            bar_colors = [('#00C853' if (str(lbl).lower() == 'normal') else '#FF5252') for lbl in resumen['labels']]
+            ax.bar(resumen['labels'], resumen['values'], color=bar_colors)
+            ax.set_title('Distribución de Detecciones')
+            ax.set_ylabel('Cantidad')
+            for i, v in enumerate(resumen['values']):
+                ax.text(i, v + 0.1, str(v), ha='center', va='bottom', fontsize=10)
+            plt.tight_layout()
 
-        # 3. Este text_input (label + input) queda dentro de .mi-caja
-        nombre_archivo = st.text_input(LABEL)
-
-        # 4. Cerramos el div
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        if st.button("Guardar csv"):
-            data = st.session_state.data
-            y_pred = st.session_state.y_pred_etiqueta
-
-            # Si y_pred es una lista o array, conviértelo en DataFrame para concatenar
-            if not isinstance(y_pred, pd.DataFrame):
-                y_pred = pd.DataFrame(y_pred, columns=["predicción"])
-
-            resultado = pd.concat([data.reset_index(drop=True), y_pred.reset_index(drop=True)], axis=1)
-            resultado.to_csv(nombre_archivo+'.csv', index=False)
-            st.success("✅ CSV guardado correctamente.")
+            pdf_bytes = generar_reporte_pdf(
+                resumen=resumen['texto'],
+                labels=resumen['labels'],
+                values=resumen['values'],
+                descripcion_amenazas=DESCRIPCIONES_AMENAZAS,
+                fig=fig_bar
+            )
+            st.download_button(
+                label="📄 Descargar reporte PDF",
+                data=pdf_bytes,
+                file_name="reporte_prediccion_IDS.pdf",
+                mime="application/pdf"
+            )
+            plt.close(fig_bar)
         else:
-            st.warning("⚠ Primero debes capturar tráfico o hacer una predicción antes de guardar.") 
+            st.warning("⚠ Primero debes capturar tráfico o hacer una predicción antes de descargar el reporte.") 
         
     
 

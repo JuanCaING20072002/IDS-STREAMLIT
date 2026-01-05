@@ -1,24 +1,9 @@
-<<<<<<< HEAD
-joblib
-streamlit
-pandas
-numpy
-pyod
-combo
-plotly
-streamlit-lottie
-requests
-scikit-learn==1.6.1
-streamlit-option-menu
-matplotlib
-psutil
-=======
 streamlit==1.46.0
 streamlit-lottie==0.0.5
 streamlit-option-menu==0.4.0
 pandas==2.3.0
 numpy==1.26.4
-scikit-learn==1.7.0
+scikit-learn==1.6.1
 scipy==1.15.3
 matplotlib==3.10.3
 plotly==6.1.2
@@ -30,4 +15,6 @@ joblib==1.5.1
 requests==2.32.4
 psutil==7.0.0
 combo==0.1.3
->>>>>>> 0cdb35b (Actualización general: reemplazo y subida de archivos, ignorando archivos grandes y de sistema)
+
+# Reportes PDF
+fpdf2>=2.7.0
